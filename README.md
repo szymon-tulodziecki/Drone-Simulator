@@ -21,4 +21,4 @@ Open [symulator/project.godot](symulator/project.godot) in Godot 4.x and run the
 
 ## Video
 
-[video.mp4](screenshots/video.mp4)
+![Video](screenshots/video.gif)
