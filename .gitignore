@@ -1,0 +1,33 @@
+# Godot 4+ - folder z plikami tymczasowymi i cache
+.godot/
+
+# Godot 3+ - folder z cache importu
+.import/
+
+# Pliki eksportu
+export.cfg
+export_presets.cfg
+
+# Skompilowane tłumaczenia
+*.translation
+
+# Pliki wykonywalne (Windows)
+*.exe
+
+# Artefakty Windows (kompilacja/linkowanie)
+*.dll
+*.pdb
+*.ilk
+*.lib
+*.exp
+
+# Ignorowanie plików Mono/C# (jeśli używasz wersji Godot .NET)
+.mono/
+data_*/
+mono_crash.*.json
+*.csproj.user
+
+# Folder na buildy gry (warto go stworzyć i ignorować, żeby nie wrzucać gotowej gry na GitHuba)
+/builds/
+/build/
+/exports/

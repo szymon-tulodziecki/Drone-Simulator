@@ -1,0 +1,57 @@
+[gd_scene format=3 uid="uid://drtxvkjdn1n7m"]
+
+[ext_resource type="Script" uid="uid://dwqbqu4y2b20x" path="res://grid.gd" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://73jw4ibv7cah" path="res://udp_listener.gd" id="2_0xm2m"]
+[ext_resource type="ArrayMesh" uid="uid://bw75gjhcqiy1x" path="res://dji_tello.glb.obj" id="2_1bvp3"]
+[ext_resource type="Script" uid="uid://b2h4mpp137wmp" path="res://drone.gd" id="2_7mycd"]
+[ext_resource type="Script" uid="uid://dh8nlc4q4kt25" path="res://camera_rig.gd" id="3_h2yge"]
+[ext_resource type="Script" uid="uid://bo1gl1836upkx" path="res://obstacles.gd" id="4_272bh"]
+[ext_resource type="Script" uid="uid://bf1itugr27og3" path="res://ui.gd" id="4_lquwl"]
+[ext_resource type="Script" uid="uid://bxxvof14ljo27" path="res://trail.gd" id="8_5vw27"]
+[ext_resource type="Script" uid="uid://dn5bc1xr323ky" path="res://obstacle_2.gd" id="9_kek77"]
+[ext_resource type="Script" uid="uid://dlnxxopt50gib" path="res://helipads.gd" id="10_4c57u"]
+[ext_resource type="Script" uid="uid://5fgbhg5tyw01" path="res://dimensions.gd" id="11_efxa6"]
+
+[node name="Main" type="Node3D" unique_id=1270179205]
+
+[node name="Grid" type="Node3D" parent="." unique_id=1782383067]
+script = ExtResource("1_ig7tw")
+
+[node name="Drone" type="Node3D" parent="." unique_id=2142595562]
+script = ExtResource("2_7mycd")
+
+[node name="DroneModel" type="Node3D" parent="Drone" unique_id=111302162]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Drone/DroneModel" unique_id=399361022]
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 0, 0)
+mesh = ExtResource("2_1bvp3")
+
+[node name="Obstacles" type="Node3D" parent="." unique_id=400849923]
+script = ExtResource("4_272bh")
+
+[node name="Menu" type="Node" parent="." unique_id=1845732396]
+script = ExtResource("2_0xm2m")
+
+[node name="UI" type="Node" parent="Menu" unique_id=1132319804]
+script = ExtResource("4_lquwl")
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=2032257641]
+script = ExtResource("3_h2yge")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=1591041997]
+
+[node name="Trail" type="Node3D" parent="." unique_id=95273091]
+script = ExtResource("8_5vw27")
+
+[node name="Obstacle2" type="Node3D" parent="." unique_id=1648627790]
+script = ExtResource("9_kek77")
+
+[node name="Helipads" type="Node3D" parent="." unique_id=78817769]
+script = ExtResource("10_4c57u")
+
+[node name="Dimensions" type="Node3D" parent="." unique_id=317774499]
+script = ExtResource("11_efxa6")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=572338462]
+light_indirect_energy = 1.5
+shadow_enabled = true
