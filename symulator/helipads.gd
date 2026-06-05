@@ -46,3 +46,6 @@ func _spawn_bar(px: float, py: float, pz: float, sx: float, sy: float, sz: float
 	bar.material_override = mat
 	bar.position = Vector3(px, py, pz)
 	add_child(bar)
+
+func set_hidden(h: bool):
+	visible = not h

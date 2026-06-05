@@ -18,7 +18,4 @@ Open [symulator/project.godot](symulator/project.godot) in Godot 4.x and run the
 
 ![Screenshot 1](screenshots/ss1.png)
 ![Screenshot 2](screenshots/ss2.png)
-
-## Video
-
-![Video](screenshots/video.gif)
+![Screenshot 3](screenshots/ss3.png)
