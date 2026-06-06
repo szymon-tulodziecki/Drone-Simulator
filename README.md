@@ -2,7 +2,7 @@
 
 ![Godot Engine](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)
 ![GDScript](https://img.shields.io/badge/GDScript-355570?logo=godot-engine&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%28.exe%29-lightgrey)
 ![License](https://img.shields.io/badge/License-GPL%202.0-blue)
 
 A **DJI Tello flight simulator** built in Godot 4 that runs real `easytello`-style Python flight scripts in a 3D scene. Write the same code you would send to a physical Tello, press **Run**, and watch the drone fly the trajectory — complete with obstacle courses, collision detection, a flight trail with measured distances, and step-by-step execution for debugging.
@@ -29,28 +29,13 @@ Built as an educational tool for learning drone programming without needing real
 
 ## Screenshots
 
-### Obstacle course
-The full arena: ring gates, support poles, helipads, safety tape, cones and the configuration sidebar.
-
 ![Obstacle course](screenshots/ss1.png)
-
-### Split view — code & scene
-Write Python on the right, see the drone execute it on the left.
 
 ![Split view](screenshots/ss3.png)
 
-### Flight trail with measured segments
-Each move is drawn as an arrow labelled with its distance; curves are rendered as smooth arcs.
-
 ![Flight trail](screenshots/ss2.png)
 
-### Curve trajectories
-`curve()` commands produce smooth Bézier arcs through the scene.
-
 ![Curve trajectory](screenshots/ss4.png)
-
-### Trajectory between helipads
-A complete flight path arcing between the two landing pads.
 
 ![Path between helipads](screenshots/ss5.png)
 
@@ -67,6 +52,31 @@ A complete flight path arcing between the two landing pads.
 4. Press **F5** (or the ▶ button) to run the main scene.
 
 ---
+
+## Building for Windows (.exe)
+
+To export a standalone Windows executable from this project:
+
+1. Install Godot export templates (Project → Install Export Templates) or download them from the Godot website.
+2. Open the project (`symulator/project.godot`) in Godot, then go to Project → Export and add the **Windows Desktop** (or **Windows Desktop (64-bit)**) preset. Configure icon and enable "Embed PCK" if you want a single `.exe` file.
+3. Click **Export Project** and choose an output path (for example `build/Drone-Simulator.exe`).
+
+Command-line export (requires Godot on PATH):
+
+```powershell
+godot --export "Windows Desktop" "build/Drone-Simulator.exe"
+```
+
+For an optimized release build:
+
+```powershell
+godot --export-release "Windows Desktop" "build/Drone-Simulator.exe"
+```
+
+If you already have an export preset configured, you can reuse `symulator/export_presets.cfg` for the project export settings.
+
+Notes: ensure export templates are installed and test the produced `.exe` on a Windows machine.
+
 
 ## Usage
 
