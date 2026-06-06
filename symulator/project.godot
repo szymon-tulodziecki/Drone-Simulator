@@ -13,7 +13,7 @@ config_version=5
 config/name="Symulator"
 run/main_scene="uid://drtxvkjdn1n7m"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://IKONA.png"
 
 [physics]
 

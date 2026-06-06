@@ -8,6 +8,8 @@ const LINE_COLOR = Color(0.0, 0.8, 0.5)
 const MIN_DIST = 0.015
 
 var segments: Array = []
+var segment_labels: Array = []
+var show_lengths: bool = true
 
 # ślad na żywo (łuki)
 var line_instance: MeshInstance3D
@@ -47,11 +49,21 @@ func _on_segment_finished(from_pos: Vector3, to_pos: Vector3, cmd: String):
 	var dist_m = from_pos.distance_to(to_pos)
 	if dist_m < 0.01:
 		return
-	# dla curve mierzymy długość łuku po punktach, nie odległość prostą
+	var is_curve = cmd.begins_with("curve")
 	var dist_cm = round(dist_m * 100)
-	if cmd.begins_with("curve"):
-		dist_cm = round(_arc_length(from_pos, to_pos) * 100)
-	_spawn_arrow(from_pos, to_pos, dist_cm, cmd.begins_with("curve"))
+	_spawn_arrow(from_pos, to_pos, dist_cm, is_curve)
+
+func _end_tangent(_to_pos: Vector3) -> Vector3:
+	# kierunek styczny na końcu trajektorii (z ostatnich zarejestrowanych punktów)
+	if points.size() < 2:
+		return Vector3.ZERO
+	var last = points[points.size() - 1]
+	var i = points.size() - 2
+	while i >= 0 and last.distance_to(points[i]) < 0.02:
+		i -= 1
+	if i < 0:
+		return Vector3.ZERO
+	return last - points[i]
 
 func _arc_length(from_pos: Vector3, to_pos: Vector3) -> float:
 	# zsumuj długość zarejestrowanych punktów od from do to
@@ -98,6 +110,13 @@ func _spawn_arrow(from_pos: Vector3, to_pos: Vector3, dist_cm: float, is_curve: 
 		_orient_cylinder(shaft, direction)
 		segment_node.add_child(shaft)
 
+	# Kierunek grotu: dla curve używamy stycznej z końca toru
+	var head_dir = direction
+	if is_curve:
+		var tangent = _end_tangent(to_pos)
+		if tangent.length() > 0.001:
+			head_dir = tangent
+
 	# Grot strzałki (zawsze, wskazuje kierunek dotarcia)
 	var head = MeshInstance3D.new()
 	var head_mesh = CylinderMesh.new()
@@ -106,22 +125,25 @@ func _spawn_arrow(from_pos: Vector3, to_pos: Vector3, dist_cm: float, is_curve: 
 	head_mesh.height = 0.06
 	head.mesh = head_mesh
 	head.material_override = mat
-	head.position = to_pos - direction.normalized() * 0.03
-	_orient_cylinder(head, direction)
+	head.position = to_pos - head_dir.normalized() * 0.03
+	_orient_cylinder(head, head_dir)
 	segment_node.add_child(head)
 
-	# Etykieta
-	var label = Label3D.new()
-	label.text = str(int(dist_cm)) + " cm"
-	label.position = mid + Vector3(0, 0.08, 0)
-	label.font_size = 64
-	label.pixel_size = 0.002
-	label.modulate = LABEL_COLOR
-	label.outline_size = 8
-	label.outline_modulate = Color.BLACK
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	segment_node.add_child(label)
+	# Etykieta długości – nie dla krzywych
+	if not is_curve:
+		var label = Label3D.new()
+		label.text = str(int(dist_cm)) + " cm"
+		label.position = mid + Vector3(0, 0.08, 0)
+		label.font_size = 64
+		label.pixel_size = 0.002
+		label.modulate = LABEL_COLOR
+		label.outline_size = 8
+		label.outline_modulate = Color.BLACK
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true
+		label.visible = show_lengths
+		segment_node.add_child(label)
+		segment_labels.append(label)
 
 func _orient_cylinder(node: Node3D, direction: Vector3):
 	if direction.length() < 0.001:
@@ -140,8 +162,15 @@ func _on_trail_cleared():
 	for s in segments:
 		s.queue_free()
 	segments.clear()
+	segment_labels.clear()
 	points.clear()
 	line_mesh.clear_surfaces()
+
+func set_show_lengths(on: bool):
+	show_lengths = on
+	for lbl in segment_labels:
+		if is_instance_valid(lbl):
+			lbl.visible = on
 
 func clear_trail():
 	_on_trail_cleared()

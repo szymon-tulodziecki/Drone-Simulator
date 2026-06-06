@@ -1,21 +1,176 @@
-# Drone-Simulator
+# Drone Simulator
 
-![Godot Engine](https://img.shields.io/badge/Godot-4.x-478CBF?logo=godot-engine&logoColor=white)
+![Godot Engine](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)
+![GDScript](https://img.shields.io/badge/GDScript-355570?logo=godot-engine&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
+![License](https://img.shields.io/badge/License-GPL%202.0-blue)
 
-Drone-Simulator is a lightweight drone flight sandbox built with Godot Engine. It focuses on simple physics, a clean UI, and quick iteration for testing flight behavior in a small scene.
+A **DJI Tello flight simulator** built in Godot 4 that runs real `easytello`-style Python flight scripts in a 3D scene. Write the same code you would send to a physical Tello, press **Run**, and watch the drone fly the trajectory — complete with obstacle courses, collision detection, a flight trail with measured distances, and step-by-step execution for debugging.
+
+Built as an educational tool for learning drone programming without needing real hardware.
+
+---
 
 ## Features
 
-- Basic drone movement with responsive controls
-- Simple obstacles and helipads to practice landing
-- Minimal UI for status and feedback
+| | |
+|---|---|
+| **Python interpreter** | Parses and executes `easytello`-style scripts — variables, `for`/`while` loops, `if/elif/else`, lists, arithmetic and the full Tello command set. |
+| **Live code validation** | Code is checked as you type; syntax errors are reported and the offending line is highlighted in red. |
+| **Collision detection** | The drone reacts to poles and rings; flying cleanly through a ring's opening is allowed, clipping it stops the flight. |
+| **Step-by-step mode** | Execute the flight one command at a time to inspect each movement. |
+| **Manual control** | Fly freely with the keyboard (WSAD / Q-E / Space-Shift). |
+| **Flight trail** | Every segment is drawn with a direction arrow and its length in centimeters (toggleable). |
+| **Split view** | Edit code and watch the 3D scene side by side. |
+| **Configurable arena** | Toggle obstacles, helipads, decorations and dimension labels; switch the grid between 8×8 and 16×16. |
+| **Studio lighting** | Three-point lighting setup with soft shadows and a textured concrete floor. |
 
-## Run
-
-Open [symulator/project.godot](symulator/project.godot) in Godot 4.x and run the main scene.
+---
 
 ## Screenshots
 
-![Screenshot 1](screenshots/ss1.png)
-![Screenshot 2](screenshots/ss2.png)
-![Screenshot 3](screenshots/ss3.png)
+### Obstacle course
+The full arena: ring gates, support poles, helipads, safety tape, cones and the configuration sidebar.
+
+![Obstacle course](screenshots/ss1.png)
+
+### Split view — code & scene
+Write Python on the right, see the drone execute it on the left.
+
+![Split view](screenshots/ss3.png)
+
+### Flight trail with measured segments
+Each move is drawn as an arrow labelled with its distance; curves are rendered as smooth arcs.
+
+![Flight trail](screenshots/ss2.png)
+
+### Curve trajectories
+`curve()` commands produce smooth Bézier arcs through the scene.
+
+![Curve trajectory](screenshots/ss4.png)
+
+### Trajectory between helipads
+A complete flight path arcing between the two landing pads.
+
+![Path between helipads](screenshots/ss5.png)
+
+---
+
+## Getting Started
+
+1. Install [Godot Engine 4.6+](https://godotengine.org/download).
+2. Clone this repository:
+   ```bash
+   git clone https://github.com/<your-user>/Drone-Simulator.git
+   ```
+3. Open [`symulator/project.godot`](symulator/project.godot) in Godot.
+4. Press **F5** (or the ▶ button) to run the main scene.
+
+---
+
+## Usage
+
+### Writing a flight script
+
+Open the **Kod lotu** (Flight Code) tab and paste an `easytello`-style script:
+
+```python
+from easytello import tello
+
+my_drone = tello.Tello()
+
+my_drone.takeoff()
+my_drone.up(100)
+
+my_drone.forward(120)
+my_drone.right(120)     # first obstacle
+my_drone.down(90)
+my_drone.left(120)
+my_drone.forward(140)
+my_drone.land()
+```
+
+Loops and variables are supported too:
+
+```python
+for i in range(4):
+    my_drone.forward(50)
+    my_drone.cw(90)
+```
+
+Press **>> Uruchom** (Run) to fly. If the code has an error, the line is highlighted and the message is shown at the bottom of the editor.
+
+### Supported commands
+
+| Command | Arguments | Description |
+|---|---|---|
+| `takeoff()` | — | Lift off |
+| `land()` | — | Land |
+| `up(d)` / `down(d)` | cm | Vertical movement |
+| `forward(d)` / `back(d)` | cm | Move along facing direction |
+| `left(d)` / `right(d)` | cm | Strafe |
+| `cw(deg)` / `ccw(deg)` | degrees | Rotate clockwise / counter-clockwise |
+| `go(x, y, z, speed)` | cm, cm/s | Move to a relative point |
+| `curve(x1, y1, z1, x2, y2, z2, speed)` | cm, cm/s | Fly a curved path through two relative points |
+| `set_speed(s)` | cm/s | Set flight speed |
+
+### Toolbar
+
+| Button | Action |
+|---|---|
+| **Tryb krokowy** (Step mode) | Toggle step-by-step execution |
+| **▶ Kolejny krok** (Next step) | Execute the next command |
+| **>> Uruchom** (Run) | Run the full script |
+| **Reset** | Reset the drone to its start position |
+| **▣ Split** | Toggle the side-by-side code/scene view |
+
+### Manual keyboard control
+
+Enable **Sterowanie klawiszami** (Keyboard control) in the sidebar:
+
+| Keys | Action |
+|---|---|
+| `W` / `S` | Forward / back |
+| `A` / `D` | Left / right |
+| `Q` / `E` | Rotate left / right |
+| `Space` / `Shift` | Up / down |
+
+### Camera
+
+- **Right mouse button + drag** — orbit the camera
+- **Mouse wheel** — zoom in / out
+
+---
+
+## Project Structure
+
+```
+symulator/
+├── project.godot              # Godot project file
+├── main.tscn                  # Main scene (lighting, camera, drone, UI)
+├── drone.gd                   # Drone movement, command queue, collisions, step mode
+├── interpreter.gd             # Python-subset parser & evaluator (PyInterpreter)
+├── ui.gd                      # In-game UI: toolbar, sidebar, code editor, tabs
+├── trail.gd                   # Flight trail rendering (arrows, distance labels)
+├── grid.gd                    # Configurable floor grid + collision tiles
+├── camera_rig.gd              # Orbit camera controller
+├── environment_decor.gd       # Floor, safety tape and cones around the arena
+├── helipads.gd                # Landing pads
+├── dimensions.gd              # Obstacle dimension labels
+├── obstacles.gd / obstacle_2.gd  # Obstacle scenes + ring collision fix-up
+└── Przeszkoda1/2_Gotowa.tscn  # Pre-built obstacle scenes
+```
+
+---
+
+## Built With
+
+- **[Godot Engine 4.6](https://godotengine.org/)** — game engine
+- **GDScript** — all gameplay and tooling logic
+- A custom Python-subset interpreter (no external runtime required)
+
+---
+
+## License
+
+This project is licensed under the **GNU General Public License v2.0**. See [`LICENSE`](LICENSE) for the full text.

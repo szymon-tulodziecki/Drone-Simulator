@@ -14,7 +14,7 @@ var is_rotating = false
 func _ready():
 	_update_camera()
 
-func _input(event):
+func _unhandled_input(event):
 	# prawy przycisk myszy - obracanie
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT:

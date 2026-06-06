@@ -29,7 +29,7 @@ func _spawn_tile(x: int, z: int):
 	mesh_instance.mesh = mesh
 	
 	var mat = StandardMaterial3D.new()
-	if (int(x / 2) + int(z / 2)) % 2 == 0:
+	if ((x >> 1) + (z >> 1)) % 2 == 0:
 		mat.albedo_color = Color(0.85, 0.85, 0.85)
 	else:
 		mat.albedo_color = Color(0.6, 0.6, 0.6)
@@ -45,6 +45,9 @@ func _spawn_tile(x: int, z: int):
 	tiles.append(mesh_instance)
 	
 	var body = StaticBody3D.new()
+	# podłoga na warstwie 2 — dron jej nie traktuje jako przeszkody
+	body.collision_layer = 2
+	body.collision_mask = 0
 	var col = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
 	shape.size = Vector3(TILE_SIZE - 0.01, 0.02, TILE_SIZE - 0.01)

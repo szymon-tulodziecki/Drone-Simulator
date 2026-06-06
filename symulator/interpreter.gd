@@ -4,6 +4,8 @@ extends RefCounted
 var vars := {}
 var commands := []
 var error := ""
+var error_line := -1
+var current_line := -1
 var drone_cmds := {
 	"takeoff": 0, "land": 0,
 	"up": 1, "down": 1, "forward": 1, "back": 1, "left": 1, "right": 1,
@@ -16,9 +18,12 @@ func run(source: String) -> Dictionary:
 	vars = {}
 	commands = []
 	error = ""
+	error_line = -1
+	current_line = -1
 	step_count = 0
 	var lines = source.split("\n")
 	var prog = []
+	var line_no = 0
 	for raw in lines:
 		var s = raw
 		var hp = _find_comment(s)
@@ -26,12 +31,17 @@ func run(source: String) -> Dictionary:
 			s = s.substr(0, hp)
 		var stripped = s.strip_edges()
 		if stripped.is_empty():
+			line_no += 1
 			continue
 		if stripped.begins_with("from ") or stripped.begins_with("import ") or stripped.contains("Tello()"):
+			line_no += 1
 			continue
-		prog.append({"indent": _indent(raw), "text": stripped})
+		prog.append({"indent": _indent(raw), "text": stripped, "line": line_no})
+		line_no += 1
 	_exec_block(prog, 0, prog.size(), 0)
-	return {"commands": commands, "error": error}
+	if error != "" and error_line == -1:
+		error_line = current_line
+	return {"commands": commands, "error": error, "error_line": error_line}
 
 func _find_comment(line: String) -> int:
 	var in_str = false
@@ -66,6 +76,7 @@ func _exec_block(prog: Array, start: int, end: int, base_indent: int):
 		var line = prog[i]
 		if line.indent < base_indent: return
 		var text = line.text
+		current_line = line.line
 
 		# --- for ---
 		if text.begins_with("for "):

@@ -26,15 +26,75 @@ var curve_duration: float = 0.0
 var segment_start_pos: Vector3
 var current_cmd: String = ""
 
+var collided = false
+var manual_mode = false
+var manual_speed: float = 1.0
+var manual_rot_speed: float = 90.0
+
 signal position_changed(pos: Vector3)
 signal segment_finished(from_pos: Vector3, to_pos: Vector3, cmd: String)
 signal trail_cleared
+signal collision_occurred(obstacle_name: String)
 
 func _ready():
 	set_start_position(0, 0)
 	target_pos = position
+	_setup_collision_area()
+
+func _setup_collision_area():
+	var area = Area3D.new()
+	area.name = "CollisionArea"
+	var col = CollisionShape3D.new()
+	var shape = SphereShape3D.new()
+	# mała kula kolizji (~4 cm) żeby dron zmieścił się w obręczy 39 cm
+	shape.radius = 0.04
+	col.shape = shape
+	area.add_child(col)
+	# wykrywaj TYLKO przeszkody (warstwa 1). Podłoga siatki jest na warstwie 2.
+	area.collision_layer = 0
+	area.collision_mask = 1
+	area.monitoring = true
+	add_child(area)
+	area.body_entered.connect(_on_body_entered)
+	area.area_entered.connect(_on_area_entered)
+	area.body_exited.connect(_on_overlap_exit)
+	area.area_exited.connect(_on_overlap_exit)
+
+func _on_overlap_exit(_n: Node):
+	if manual_mode:
+		collided = false
+
+func _on_body_entered(body: Node):
+	_handle_collision(_friendly_name(body))
+
+func _on_area_entered(area: Node):
+	_handle_collision(_friendly_name(area))
+
+func _friendly_name(node: Node) -> String:
+	var n = node
+	while n != null:
+		var nm = String(n.name)
+		if nm != "" and not nm.begins_with("@") and nm != "StaticBody3D" and nm != "Area3D":
+			return nm
+		n = n.get_parent()
+	return "przeszkoda"
+
+func _handle_collision(obstacle: String):
+	if collided or landed:
+		return
+	collided = true
+	moving = false
+	rotating = false
+	curving = false
+	if not manual_mode:
+		command_queue.clear()
+	print("!!! KOLIZJA z: ", obstacle)
+	emit_signal("collision_occurred", obstacle)
 
 func _process(delta):
+	if manual_mode:
+		_process_manual(delta)
+		return
 	if rotating:
 		var diff = target_yaw - current_yaw
 		if abs(diff) < 0.5:
@@ -106,7 +166,46 @@ func set_step_mode(enabled: bool):
 	waiting_for_step = false
 
 func next_step():
-	waiting_for_step = false
+	# 1. jeśli trwa ruch — dokończ bieżący segment natychmiast
+	if moving:
+		position = target_pos
+		moving = false
+		emit_signal("position_changed", position)
+		emit_signal("segment_finished", segment_start_pos, position, current_cmd)
+	elif rotating:
+		current_yaw = target_yaw
+		rotation_degrees.y = current_yaw
+		rotating = false
+	elif curving:
+		position = curve_p2
+		curving = false
+		emit_signal("position_changed", position)
+		emit_signal("segment_finished", segment_start_pos, position, current_cmd)
+
+	# 2. od razu wystartuj kolejną komendę i też ją skompletuj (snap do celu)
+	if command_queue.size() > 0:
+		var cmd = command_queue.pop_front()
+		_execute(cmd)
+		if moving:
+			position = target_pos
+			moving = false
+			emit_signal("position_changed", position)
+			emit_signal("segment_finished", segment_start_pos, position, current_cmd)
+		elif rotating:
+			current_yaw = target_yaw
+			rotation_degrees.y = current_yaw
+			rotating = false
+		elif curving:
+			# dla krzywej krok-po-kroku też lecimy do końca łuku
+			position = curve_p2
+			curving = false
+			emit_signal("position_changed", position)
+			emit_signal("segment_finished", segment_start_pos, position, current_cmd)
+		print("[Drone] krok wykonany: '", cmd, "', poz=", position, " yaw=", current_yaw)
+	else:
+		print("[Drone] kolejka pusta")
+
+	waiting_for_step = true
 
 func reset():
 	print("=== RESET ===")
@@ -116,8 +215,45 @@ func reset():
 	curving = false
 	waiting_for_step = false
 	landed = true
+	collided = false
 	set_start_position(start_tx, start_tz)
 	emit_signal("trail_cleared")
+
+func begin_step_pause():
+	waiting_for_step = true
+
+func set_manual_mode(on: bool):
+	manual_mode = on
+	if on:
+		command_queue.clear()
+		moving = false
+		rotating = false
+		curving = false
+		waiting_for_step = false
+		collided = false
+		if landed:
+			position.y = 0.85
+			landed = false
+
+func _process_manual(delta):
+	var v = Vector3.ZERO
+	if Input.is_key_pressed(KEY_W): v += _local_dir(Vector3(0, 0, 1))
+	if Input.is_key_pressed(KEY_S): v += _local_dir(Vector3(0, 0, -1))
+	if Input.is_key_pressed(KEY_A): v += _local_dir(Vector3(1, 0, 0))
+	if Input.is_key_pressed(KEY_D): v += _local_dir(Vector3(-1, 0, 0))
+	if Input.is_key_pressed(KEY_SPACE): v.y += 1
+	if Input.is_key_pressed(KEY_SHIFT): v.y -= 1
+	if v.length() > 0.01:
+		position += v.normalized() * manual_speed * delta
+		position.y = max(position.y, 0.05)
+		emit_signal("position_changed", position)
+	var rot = 0.0
+	if Input.is_key_pressed(KEY_Q): rot += 1
+	if Input.is_key_pressed(KEY_E): rot -= 1
+	if rot != 0:
+		current_yaw += rot * manual_rot_speed * delta
+		target_yaw = current_yaw
+		rotation_degrees.y = current_yaw
 
 # wektor ruchu względem orientacji drona (yaw)
 func _local_dir(local: Vector3) -> Vector3:

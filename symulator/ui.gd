@@ -26,7 +26,9 @@ var status_label: Label
 var error_label: Label
 var btn_tab_scena: Button
 var btn_tab_kod: Button
+var btn_tab_split: Button
 var btn_step_toolbar: Button
+var current_view: String = "scena"
 
 var input_x: SpinBox
 var input_y: SpinBox
@@ -37,9 +39,16 @@ var step_enabled = false
 
 func _ready():
 	_build_ui()
+	drone.collision_occurred.connect(_on_drone_collision)
+	get_viewport().size_changed.connect(_apply_view_layout)
+
+func _on_drone_collision(obstacle_name: String):
+	status_label.text = "KOLIZJA z przeszkodą! (%s)" % obstacle_name
+	status_label.add_theme_color_override("font_color", Color("f48771"))
 
 func _build_ui():
 	var canvas = CanvasLayer.new()
+	canvas.layer = 10
 	get_tree().root.call_deferred("add_child", canvas)
 	await get_tree().process_frame
 
@@ -57,6 +66,7 @@ func _build_ui():
 	_style_panel(tab_kod_panel, C_BG, false)
 	root.add_child(tab_kod_panel)
 	_build_editor(tab_kod_panel)
+
 
 	# === 2. PASEK ZAKŁADEK (Rysowany nad Panelem z kodem) ===
 	tabbar = PanelContainer.new()
@@ -80,6 +90,17 @@ func _build_ui():
 	btn_tab_kod.pressed.connect(func(): _switch_view("kod"))
 	tabs.add_child(btn_tab_kod)
 
+	var tab_spacer = Control.new()
+	tab_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_child(tab_spacer)
+
+	btn_tab_split = _mk_tab("▣  Split")
+	btn_tab_split.custom_minimum_size = Vector2(110, 0)
+	btn_tab_split.pressed.connect(func():
+		_switch_view("scena" if current_view == "split" else "split")
+	)
+	tabs.add_child(btn_tab_split)
+
 	# === 3. LEWY PANEL (zwijany, nad zakładkami) ===
 	sidebar = PanelContainer.new()
 	sidebar.custom_minimum_size = Vector2(SIDEBAR_W, 0)
@@ -87,6 +108,8 @@ func _build_ui():
 	sidebar.offset_top = TOOLBAR_H
 	sidebar.offset_bottom = -24
 	sidebar.offset_right = SIDEBAR_W
+	sidebar.mouse_filter = Control.MOUSE_FILTER_STOP
+	sidebar.gui_input.connect(_consume_wheel)
 	_style_panel(sidebar, C_SIDEBAR, true)
 	root.add_child(sidebar)
 	_build_sidebar(sidebar)
@@ -117,11 +140,18 @@ func _build_ui():
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tb.add_child(spacer)
 
-	btn_step_toolbar = _mk_button("> Krok: OFF", 110)
+	btn_step_toolbar = _mk_button("Tryb krokowy: OFF", 150)
 	btn_step_toolbar.toggle_mode = true
+	btn_step_toolbar.tooltip_text = "Włącz/wyłącz tryb krokowy — wykonywanie po jednej komendzie"
 	_color_button(btn_step_toolbar, C_BLUE)
 	btn_step_toolbar.toggled.connect(_on_step_toggled)
 	tb.add_child(btn_step_toolbar)
+
+	btn_step = _mk_button("▶ Kolejny krok", 140)
+	btn_step.tooltip_text = "Wykonaj następną komendę (włącza tryb krokowy jeśli był wyłączony)"
+	_color_button(btn_step, Color("d68a1f"))
+	btn_step.pressed.connect(_on_next_step_pressed)
+	tb.add_child(btn_step)
 
 	var btn_run = _mk_button(">> Uruchom", 110)
 	_color_button(btn_run, C_GREEN)
@@ -149,14 +179,20 @@ func _build_ui():
 	_switch_view("scena")
 
 func _build_sidebar(sb_panel: PanelContainer):
-	var box = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	sb_panel.add_child(box)
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sb_panel.add_child(scroll)
 
-	var hdr = Label.new()
-	hdr.add_theme_font_size_override("font_size", 11)
-	hdr.add_theme_color_override("font_color", Color("888888"))
-	box.add_child(hdr)
+	var box = VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 6)
+	scroll.add_child(box)
+
+	# =====================================================
+	# === SEKCJA: DRON ===
+	# =====================================================
+	_add_section_header(box, "DRON")
 
 	var lbl = Label.new(); lbl.text = "Pozycja startowa"
 	lbl.add_theme_color_override("font_color", C_TEXT)
@@ -172,8 +208,6 @@ func _build_sidebar(sb_panel: PanelContainer):
 	btn_set.pressed.connect(_on_set_pressed)
 	box.add_child(btn_set)
 
-	box.add_child(HSeparator.new())
-
 	var h2 = HBoxContainer.new(); box.add_child(h2)
 	var ls = Label.new(); ls.text = "Prędkość:"; ls.add_theme_color_override("font_color", C_TEXT); h2.add_child(ls)
 	input_speed = SpinBox.new()
@@ -181,30 +215,29 @@ func _build_sidebar(sb_panel: PanelContainer):
 	input_speed.value_changed.connect(_on_speed_changed)
 	h2.add_child(input_speed)
 
-	btn_step = _mk_button("Następny krok", 0)
-	btn_step.disabled = true
-	btn_step.pressed.connect(_on_next_step_pressed)
-	box.add_child(btn_step)
+	var cb_manual = CheckBox.new()
+	cb_manual.text = "Sterowanie klawiszami"
+	cb_manual.button_pressed = false
+	cb_manual.add_theme_color_override("font_color", C_TEXT)
+	cb_manual.toggled.connect(_on_manual_toggled)
+	box.add_child(cb_manual)
 
-	box.add_child(HSeparator.new())
+	var hint = Label.new()
+	hint.text = "WSAD - ruch\nQ/E - obrót\nSpacja/Shift - góra/dół"
+	hint.add_theme_font_size_override("font_size", 10)
+	hint.add_theme_color_override("font_color", Color("888888"))
+	box.add_child(hint)
 
-	btn_dims = _mk_button("Pokaż wymiary", 0)
-	btn_dims.toggle_mode = true
-	btn_dims.toggled.connect(_on_dims_toggled)
-	box.add_child(btn_dims)
-
-	# --- NOWA SEKCJA WIDOCZNOŚCI I SIATKI ---
-	box.add_child(HSeparator.new())
-
-	var lbl_vis = Label.new(); lbl_vis.text = "Widoczność"
-	lbl_vis.add_theme_color_override("font_color", C_TEXT)
-	box.add_child(lbl_vis)
+	# =====================================================
+	# === SEKCJA: ŚRODOWISKO ===
+	# =====================================================
+	_add_section_header(box, "ŚRODOWISKO")
 
 	var cb_obstacles = CheckBox.new()
 	cb_obstacles.text = "Pokaż przeszkody"
 	cb_obstacles.button_pressed = true
 	cb_obstacles.add_theme_color_override("font_color", C_TEXT)
-	cb_obstacles.toggled.connect(func(on): 
+	cb_obstacles.toggled.connect(func(on):
 		get_node("/root/Main/Obstacles").set_hidden(not on)
 		get_node("/root/Main/Obstacle2").set_hidden(not on)
 	)
@@ -217,14 +250,20 @@ func _build_sidebar(sb_panel: PanelContainer):
 	cb_helipads.toggled.connect(func(on): get_node("/root/Main/Helipads").set_hidden(not on))
 	box.add_child(cb_helipads)
 
-	var cb_trail = CheckBox.new()
-	cb_trail.text = "Pokaż trasę"
-	cb_trail.button_pressed = true
-	cb_trail.add_theme_color_override("font_color", C_TEXT)
-	cb_trail.toggled.connect(func(on): trail.visible = on)
-	box.add_child(cb_trail)
+	btn_dims = _mk_button("Pokaż wymiary", 0)
+	btn_dims.toggle_mode = true
+	btn_dims.toggled.connect(_on_dims_toggled)
+	box.add_child(btn_dims)
 
-	box.add_child(HSeparator.new())
+	var cb_decor = CheckBox.new()
+	cb_decor.text = "Pokaż dekoracje"
+	cb_decor.button_pressed = true
+	cb_decor.add_theme_color_override("font_color", C_TEXT)
+	cb_decor.toggled.connect(func(on):
+		var d = get_node_or_null("/root/Main/EnvironmentDecor")
+		if d: d.visible = on
+	)
+	box.add_child(cb_decor)
 
 	var lbl_grid = Label.new(); lbl_grid.text = "Rozmiar siatki"
 	lbl_grid.add_theme_color_override("font_color", C_TEXT)
@@ -237,13 +276,59 @@ func _build_sidebar(sb_panel: PanelContainer):
 	var btn_16 = _mk_button("16x16", 0)
 	btn_16.pressed.connect(func(): get_node("/root/Main/Grid").rebuild(16))
 	hgrid.add_child(btn_16)
-	
-	box.add_child(HSeparator.new())
-	# -----------------------------------------
+
+	# =====================================================
+	# === SEKCJA: TRASA LOTU ===
+	# =====================================================
+	_add_section_header(box, "TRASA LOTU")
+
+	var cb_trail = CheckBox.new()
+	cb_trail.text = "Pokaż trasę"
+	cb_trail.button_pressed = true
+	cb_trail.add_theme_color_override("font_color", C_TEXT)
+	cb_trail.toggled.connect(func(on): trail.visible = on)
+	box.add_child(cb_trail)
+
+	var cb_lengths = CheckBox.new()
+	cb_lengths.text = "Pokaż długości kroków"
+	cb_lengths.button_pressed = true
+	cb_lengths.add_theme_color_override("font_color", C_TEXT)
+	cb_lengths.toggled.connect(func(on): trail.set_show_lengths(on))
+	box.add_child(cb_lengths)
 
 	var btn_clear = _mk_button("Wyczyść trasę", 0)
 	btn_clear.pressed.connect(_on_clear_pressed)
 	box.add_child(btn_clear)
+
+func _consume_wheel(event: InputEvent):
+	if event is InputEventMouseButton:
+		var b = event.button_index
+		if b == MOUSE_BUTTON_WHEEL_UP or b == MOUSE_BUTTON_WHEEL_DOWN \
+			or b == MOUSE_BUTTON_WHEEL_LEFT or b == MOUSE_BUTTON_WHEEL_RIGHT:
+			get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent):
+	# blokuj scroll przewijający kamerę, gdy mysz jest nad sidebarem lub panelem kodu
+	if not (event is InputEventMouseButton):
+		return
+	var b = event.button_index
+	if b != MOUSE_BUTTON_WHEEL_UP and b != MOUSE_BUTTON_WHEEL_DOWN:
+		return
+	var mp = event.position
+	if sidebar and sidebar.visible and sidebar.get_global_rect().has_point(mp):
+		get_viewport().set_input_as_handled()
+		return
+	if tab_kod_panel and tab_kod_panel.visible and tab_kod_panel.get_global_rect().has_point(mp):
+		get_viewport().set_input_as_handled()
+
+func _add_section_header(parent: Node, text: String):
+	var sep = HSeparator.new()
+	parent.add_child(sep)
+	var hdr = Label.new()
+	hdr.text = text
+	hdr.add_theme_font_size_override("font_size", 11)
+	hdr.add_theme_color_override("font_color", Color("7aa6da"))
+	parent.add_child(hdr)
 
 func _build_editor(panel: PanelContainer):
 	var margin = MarginContainer.new()
@@ -258,11 +343,15 @@ func _build_editor(panel: PanelContainer):
 
 	code_edit = CodeEdit.new()
 	code_edit.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	code_edit.custom_minimum_size = Vector2(0, 0)
+	code_edit.clip_contents = true
 	code_edit.placeholder_text = "# Wklej kod lotu w Pythonie\nmy_drone.takeoff()\nmy_drone.forward(100)\nmy_drone.land()"
 	code_edit.gutters_draw_line_numbers = true
 	code_edit.add_theme_color_override("background_color", C_BG)
 	code_edit.add_theme_color_override("font_color", C_TEXT)
 	code_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	code_edit.scroll_fit_content_height = false
 	code_edit.text_changed.connect(_on_code_changed)
 	_setup_highlighter()
 	box.add_child(code_edit)
@@ -341,16 +430,45 @@ func _style_panel(p: PanelContainer, col: Color, shadow: bool):
 	p.add_theme_stylebox_override("panel", sb)
 
 func _switch_view(view: String):
-	tab_kod_panel.visible = (view == "kod")
+	current_view = view
+	_apply_view_layout()
 	btn_tab_scena.button_pressed = (view == "scena")
 	btn_tab_kod.button_pressed = (view == "kod")
+	btn_tab_split.button_pressed = (view == "split")
+
+func _apply_view_layout():
+	var sb_off = SIDEBAR_W if sidebar_visible else 0
+	tabbar.offset_left = sb_off
+
+	# zawsze ustaw wszystkie kotwice i offsety, żeby nie zostały śmieci z poprzedniego trybu
+	tab_kod_panel.anchor_top = 0.0
+	tab_kod_panel.anchor_bottom = 1.0
+	tab_kod_panel.offset_top = TOOLBAR_H + TAB_H
+	tab_kod_panel.offset_bottom = -24
+
+	if current_view == "scena":
+		tab_kod_panel.visible = false
+	elif current_view == "kod":
+		tab_kod_panel.visible = true
+		tab_kod_panel.anchor_left = 0.0
+		tab_kod_panel.anchor_right = 1.0
+		tab_kod_panel.offset_left = sb_off
+		tab_kod_panel.offset_right = 0
+	elif current_view == "split":
+		tab_kod_panel.visible = true
+		# prawa połowa widoku 3D (czyli prawa połowa obszaru na prawo od sidebara)
+		var win_w = get_viewport().get_visible_rect().size.x
+		var split_x = sb_off + int((win_w - sb_off) / 2.0)
+		tab_kod_panel.anchor_left = 0.0
+		tab_kod_panel.anchor_right = 1.0
+		tab_kod_panel.offset_left = split_x
+		tab_kod_panel.offset_right = 0
+
 
 func _toggle_sidebar():
 	sidebar_visible = not sidebar_visible
 	sidebar.visible = sidebar_visible
-	var x = SIDEBAR_W if sidebar_visible else 0
-	tabbar.offset_left = x
-	tab_kod_panel.offset_left = x
+	_apply_view_layout()
 
 func _on_set_pressed():
 	drone.reset()
@@ -363,11 +481,47 @@ func _on_speed_changed(val: float):
 func _on_step_toggled(enabled: bool):
 	step_enabled = enabled
 	drone.set_step_mode(enabled)
-	btn_step.disabled = not enabled
-	btn_step_toolbar.text = "> Krok: ON" if enabled else "> Krok: OFF"
+	btn_step_toolbar.text = "Tryb krokowy: ON" if enabled else "Tryb krokowy: OFF"
 
 func _on_next_step_pressed():
+	# jeśli tryb krokowy nie był włączony, włącz go w locie
+	if not step_enabled:
+		step_enabled = true
+		drone.step_mode = true
+		btn_step_toolbar.set_pressed_no_signal(true)
+		btn_step_toolbar.text = "Tryb krokowy: ON"
+
+	# jeśli kolejka komend jest pusta, wczytaj kod z edytora (tak jakby kliknąć Uruchom)
+	if drone.command_queue.is_empty() and not drone.moving and not drone.rotating and not drone.curving:
+		var interp = PyInterpreter.new()
+		var res = interp.run(code_edit.text)
+		if res.error != "":
+			status_label.text = "BŁĄD: " + res.error
+			_highlight_error_line(res.error_line)
+			print("[UI] Kolejny krok: błąd interpretera -", res.error)
+			return
+		if res.commands.is_empty():
+			status_label.text = "Brak komend w kodzie"
+			print("[UI] Kolejny krok: kod nie zawiera komend")
+			return
+		drone.reset()
+		drone.set_start_position(int(input_x.value), int(input_y.value))
+		drone.step_mode = true
+		for cmd in res.commands:
+			drone.queue_command(cmd)
+		print("[UI] Kolejny krok: załadowano ", res.commands.size(), " komend")
+
 	drone.next_step()
+	status_label.text = "Krok wykonany (pozostało: %d)" % drone.command_queue.size()
+	print("[UI] Kolejny krok -> waiting_for_step =", drone.waiting_for_step, " pozostało:", drone.command_queue.size())
+
+func _on_manual_toggled(on: bool):
+	drone.set_manual_mode(on)
+	if on:
+		_switch_view("scena")
+		status_label.text = "Sterowanie ręczne aktywne (WSAD, Q/E, Space/Shift)"
+	else:
+		status_label.text = "Sterowanie ręczne wyłączone"
 
 func _on_dims_toggled(pressed: bool):
 	dims.set_visibility(pressed)
@@ -381,15 +535,27 @@ func _on_clear_pressed():
 # === KORZYSTANIE Z INTERPRETERA ===
 # ==========================================
 
+func _clear_error_highlight():
+	for ln in code_edit.get_line_count():
+		code_edit.set_line_background_color(ln, Color(0, 0, 0, 0))
+
+func _highlight_error_line(line_idx: int):
+	_clear_error_highlight()
+	if line_idx >= 0 and line_idx < code_edit.get_line_count():
+		code_edit.set_line_background_color(line_idx, Color("5a1d1d"))
+
 func _on_code_changed():
 	var interp = PyInterpreter.new()
 	var res = interp.run(code_edit.text)
 	if res.error == "":
 		error_label.text = "Kod poprawny (%d komend)" % res.commands.size()
 		error_label.add_theme_color_override("font_color", Color("4ec9b0"))
+		_clear_error_highlight()
 	else:
-		error_label.text = res.error
+		var line_info = " (linia %d)" % (res.error_line + 1) if res.error_line >= 0 else ""
+		error_label.text = res.error + line_info
 		error_label.add_theme_color_override("font_color", Color("f48771"))
+		_highlight_error_line(res.error_line)
 
 func _on_start_pressed():
 	var interp = PyInterpreter.new()
@@ -400,11 +566,16 @@ func _on_start_pressed():
 		return
 		
 	_switch_view("scena")
+	status_label.remove_theme_color_override("font_color")
 	drone.reset()
 	drone.set_start_position(int(input_x.value), int(input_y.value))
 	drone.set_step_mode(step_enabled)
-	
+
 	for cmd in res.commands:
 		drone.queue_command(cmd)
-		
-	status_label.text = "Uruchomiono lot: %d komend" % res.commands.size()
+
+	if step_enabled:
+		drone.begin_step_pause()
+		status_label.text = "Krok 1/%d - naciśnij 'Następny krok'" % res.commands.size()
+	else:
+		status_label.text = "Uruchomiono lot: %d komend" % res.commands.size()

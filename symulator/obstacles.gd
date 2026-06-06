@@ -83,6 +83,28 @@ extends Node3D
 #         child.owner = root_node
 #         _set_owner_recursive(child, root_node)
 
+func _ready():
+	_fix_ring_collisions()
+
+# Kolizje obręczy były generowane w płaszczyźnie XY, a TorusMesh leży w XZ,
+# przez co kolizyjny pierścień był obrócony o 90° i blokował środek otworu.
+# Zamieniamy Y<->Z każdej kuli, żeby kolizja pokryła widoczną obręcz.
+func _fix_ring_collisions():
+	for body in get_children():
+		if not (body is StaticBody3D):
+			continue
+		var is_ring = false
+		for c in body.get_children():
+			if c is CollisionShape3D and c.shape is SphereShape3D:
+				is_ring = true
+				break
+		if not is_ring:
+			continue
+		for c in body.get_children():
+			if c is CollisionShape3D and c.shape is SphereShape3D:
+				var p = c.position
+				c.position = Vector3(p.x, p.z, p.y)
+
 func set_hidden(h: bool):
 	visible = not h
 	for child in get_children():
