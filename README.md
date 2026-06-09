@@ -46,7 +46,7 @@ Built as an educational tool for learning drone programming without needing real
 1. Install [Godot Engine 4.6+](https://godotengine.org/download).
 2. Clone this repository:
    ```bash
-   git clone https://github.com/<your-user>/Drone-Simulator.git
+   git clone https://github.com/szymon-tulodziecki/Drone-Simulator
    ```
 3. Open [`symulator/project.godot`](symulator/project.godot) in Godot.
 4. Press **F5** (or the ▶ button) to run the main scene.
